@@ -73,7 +73,7 @@ func show_victory() -> void:
 	tween.tween_callback(func(): flash_effect.visible = false)
 
 # 按钮回调
-func _set_game_background_visible(visible: bool) -> void:
+func _set_game_background_visible(show_bg: bool) -> void:
 	if not game_background:
 		return
 	
@@ -82,7 +82,7 @@ func _set_game_background_visible(visible: bool) -> void:
 		game_background.visible = false
 		return
 	
-	game_background.visible = visible
+	game_background.visible = show_bg
 
 func _on_settings_pressed() -> void:
 	GameManager.play_sound("select")

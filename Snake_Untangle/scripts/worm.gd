@@ -95,67 +95,111 @@ func _calculate_body_sizes() -> void:
 	TOUCH_PADDING = base_grid_size * TOUCH_PADDING_RATIO
 
 ## 更新身体段大小并重新绘制（当框格尺寸改变时调用）
+## 注意：框格尺寸改变需要完全重建视觉组件
 func update_body_sizes() -> void:
 	_calculate_body_sizes()
+	# 尺寸改变需要完全重建（曲线、宽度都变了）
+	_clear_visuals()
 	_update_visuals()
 	_update_bounding_box()
 
 ## 创建视觉组件
 func _create_visuals() -> void:
 	modulate = Color(1.0, 1.0, 1.0, 1.0)
+	# 首次创建，需要重建所有组件
+	_clear_visuals()
 	_update_visuals()
 
-## 更新所有视觉组件
+## 视觉组件缓存（用于增量更新）
+var _cached_body_line: Line2D = null
+var _cached_width_curve: Curve = null
+var _cached_collision_shape: CollisionPolygon2D = null
+
+## 更新所有视觉组件（增量更新版）
 func _update_visuals() -> void:
-	# 清除旧的视觉组件
+	if grid_positions.is_empty():
+		_clear_visuals()
+		return
+	
+	# 复用或创建身体线条
+	if _cached_body_line == null or not is_instance_valid(_cached_body_line):
+		_create_body_line()
+	else:
+		_update_body_line_points()
+	
+	# 复用或创建头部三角形
+	if head_triangle == null or not is_instance_valid(head_triangle):
+		_create_head_triangle()
+	_update_head_triangle()
+	
+	# 复用或创建碰撞形状
+	if _cached_collision_shape == null or not is_instance_valid(_cached_collision_shape):
+		_create_collision_shape()
+	else:
+		_update_collision_shape_points()
+
+## 清除所有视觉组件
+func _clear_visuals() -> void:
 	for child in get_children():
 		child.queue_free()
 	body_segments.clear()
 	head_triangle = null
+	_cached_body_line = null
+	_cached_collision_shape = null
+
+## 创建身体线条（首次）
+func _create_body_line() -> void:
+	_cached_body_line = Line2D.new()
+	_cached_body_line.name = "BodyLine"
 	
-	if grid_positions.is_empty():
+	# 设置线条样式（只需设置一次）
+	_cached_body_line.default_color = worm_color
+	_cached_body_line.width = BODY_SIZE
+	_cached_body_line.joint_mode = Line2D.LINE_JOINT_ROUND
+	_cached_body_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	_cached_body_line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	_cached_body_line.antialiased = true
+	
+	# 缓存宽度曲线（只需创建一次）
+	if _cached_width_curve == null:
+		_cached_width_curve = Curve.new()
+		_cached_width_curve.min_value = 0.5
+		_cached_width_curve.max_value = 1.5
+	_cached_body_line.width_curve = _cached_width_curve
+	
+	_update_body_line_points()
+	add_child(_cached_body_line)
+	body_segments.append(_cached_body_line)
+
+## 更新身体线条点（增量更新）
+func _update_body_line_points() -> void:
+	if _cached_body_line == null:
 		return
 	
-	# 创建连续的身体线条（使用Line2D）
-	var body_line = Line2D.new()
-	body_line.name = "BodyLine"
-	
-	# 将网格位置转换为世界坐标
+	# 直接更新 points 数组，不重建节点
 	var world_points: PackedVector2Array = []
-	for grid_pos in grid_positions:
-		world_points.append(_grid_to_world(grid_pos))
-	body_line.points = world_points
-	
-	# 设置线条样式
-	body_line.default_color = worm_color
-	body_line.width = BODY_SIZE
-	body_line.joint_mode = Line2D.LINE_JOINT_ROUND
-	body_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	body_line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	body_line.antialiased = true
-	
-	# 设置渐变宽度（头部粗，尾部细）
-	var widths: PackedFloat32Array = PackedFloat32Array()
-	widths.resize(grid_positions.size())
+	world_points.resize(grid_positions.size())
 	for i in range(grid_positions.size()):
-		var t = float(i) / max(1, grid_positions.size() - 1)
-		widths[i] = lerp(HEAD_SIZE, TAIL_SIZE, t)
-	body_line.width_curve = _create_width_curve(widths)
+		world_points[i] = _grid_to_world(grid_positions[i])
+	_cached_body_line.points = world_points
 	
-	add_child(body_line)
-	body_segments.append(body_line)
-	
-	# 创建三角形头部（在最上层）
+	# 更新宽度曲线（如果长度变化）
+	var curve_point_count = _cached_width_curve.point_count
+	if curve_point_count != grid_positions.size():
+		_cached_width_curve.clear_points()
+		for i in range(grid_positions.size()):
+			var t = float(i) / max(1, grid_positions.size() - 1)
+			var width_ratio = lerp(HEAD_SIZE, TAIL_SIZE, t) / BODY_SIZE
+			_cached_width_curve.add_point(Vector2(t, width_ratio))
+
+## 创建头部三角形（首次）
+func _create_head_triangle() -> void:
 	head_triangle = Polygon2D.new()
 	head_triangle.name = "HeadTriangle"
-	head_triangle.color = Color.WHITE  # 头部用白色突出
-	_update_head_triangle()
+	head_triangle.color = Color.WHITE
 	add_child(head_triangle)
-	
-	# 创建碰撞形状（用于输入检测）
-	_update_collision_shape()
 
-## 创建宽度曲线
+## 创建宽度曲线（已废弃，使用缓存版本）
 func _create_width_curve(widths: PackedFloat32Array) -> Curve:
 	var curve = Curve.new()
 	for i in range(widths.size()):
@@ -169,7 +213,7 @@ func _update_head_triangle() -> void:
 		return
 	
 	var head_pos = _grid_to_world(grid_positions[0])
-	var neck_pos = _grid_to_world(grid_positions[1])
+	var _neck_pos = _grid_to_world(grid_positions[1])  # 用于验证头部有身体跟随
 	var dir = Vector2(move_direction.x, move_direction.y).normalized()
 	
 	# 创建三角形箭头，指向移动方向
@@ -184,58 +228,51 @@ func _update_head_triangle() -> void:
 	
 	head_triangle.polygon = triangle_points
 
-## 更新碰撞形状
-func _update_collision_shape() -> void:
-	var collision = get_node_or_null("CollisionShape")
-	if collision:
-		collision.queue_free()
-	
-	if grid_positions.is_empty():
+## 创建碰撞形状（首次）
+func _create_collision_shape() -> void:
+	_cached_collision_shape = CollisionPolygon2D.new()
+	_cached_collision_shape.name = "CollisionShape"
+	_update_collision_shape_points()
+	add_child(_cached_collision_shape)
+
+## 更新碰撞形状点（增量更新）
+func _update_collision_shape_points() -> void:
+	if _cached_collision_shape == null or grid_positions.is_empty():
 		return
-	
-	var collision_shape = CollisionPolygon2D.new()
-	collision_shape.name = "CollisionShape"
 	
 	# 创建覆盖连续身体的碰撞区域
 	var collision_points: PackedVector2Array = []
+	collision_points.resize(grid_positions.size() * 2)
 	
-	# 沿身体线段创建碰撞多边形（上半部分）
-	for i in range(grid_positions.size()):
+	var n = grid_positions.size()
+	
+	# 沿身体线段创建碰撞多边形（上半部分 + 下半部分，一次遍历）
+	for i in range(n):
 		var grid_pos = grid_positions[i]
 		var center = _grid_to_world(grid_pos)
-		var radius = lerp(HEAD_SIZE * 0.5, TAIL_SIZE * 0.5, float(i) / max(1, grid_positions.size() - 1))
+		var radius = lerp(HEAD_SIZE * 0.5, TAIL_SIZE * 0.5, float(i) / max(1, n - 1))
 		
 		# 获取线段方向
 		var dir: Vector2
 		if i == 0:
 			dir = (_grid_to_world(grid_positions[0]) - _grid_to_world(grid_positions[1])).normalized()
-		elif i == grid_positions.size() - 1:
+		elif i == n - 1:
 			dir = (_grid_to_world(grid_positions[i]) - _grid_to_world(grid_positions[i - 1])).normalized()
 		else:
 			dir = (_grid_to_world(grid_positions[i + 1]) - _grid_to_world(grid_positions[i - 1])).normalized()
 		
 		var perp = dir.orthogonal()
-		collision_points.append(center + perp * radius)
+		collision_points[i] = center + perp * radius  # 上半部分
+		collision_points[n * 2 - 1 - i] = center - perp * radius  # 下半部分（反向）
 	
-	# 沿身体线段创建碰撞多边形（下半部分，反向）
-	for i in range(grid_positions.size() - 1, -1, -1):
-		var grid_pos = grid_positions[i]
-		var center = _grid_to_world(grid_pos)
-		var radius = lerp(HEAD_SIZE * 0.5, TAIL_SIZE * 0.5, float(i) / max(1, grid_positions.size() - 1))
-		
-		var dir: Vector2
-		if i == 0:
-			dir = (_grid_to_world(grid_positions[0]) - _grid_to_world(grid_positions[1])).normalized()
-		elif i == grid_positions.size() - 1:
-			dir = (_grid_to_world(grid_positions[i]) - _grid_to_world(grid_positions[i - 1])).normalized()
-		else:
-			dir = (_grid_to_world(grid_positions[i + 1]) - _grid_to_world(grid_positions[i - 1])).normalized()
-		
-		var perp = dir.orthogonal()
-		collision_points.append(center - perp * radius)
-	
-	collision_shape.polygon = collision_points
-	add_child(collision_shape)
+	_cached_collision_shape.polygon = collision_points
+
+## 更新碰撞形状（兼容旧调用）
+func _update_collision_shape() -> void:
+	if _cached_collision_shape == null or not is_instance_valid(_cached_collision_shape):
+		_create_collision_shape()
+	else:
+		_update_collision_shape_points()
 
 ## 从网格位置创建
 func create_from_grid_positions(positions: Array[Vector2i]) -> void:
@@ -492,7 +529,7 @@ func try_move() -> bool:
 		return false
 	
 	# 检查前方是否可以移动
-	var next_pos = get_head_grid() + move_direction
+	var _next_pos = get_head_grid() + move_direction  # 预留用于边界检查
 	
 	# 这里只检查基本有效性，实际碰撞检测在移动时进行
 	current_state = State.MOVING
@@ -648,11 +685,36 @@ func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 			if current_state == State.IDLE and is_free_end:
 				clicked.emit(self)
 
+# === 性能优化：缓存父节点引用，避免每帧反射调用 ===
+var _cached_game_scene = null
+var _cached_grid_width: int = 10
+var _cached_grid_height: int = 10
+
 func _process(delta: float) -> void:
 	# 更新移动
 	if current_state == State.MOVING or current_state == State.REVERSING:
-		var parent = get_parent()
-		if parent and parent.has_method("get_all_worms"):
-			var g_width = parent.get("grid_width") if parent.has_method("get_all_worms") else 10
-			var g_height = parent.get("grid_height") if parent.has_method("get_all_worms") else 10
-			update_move(delta, parent.get_all_worms(), g_width, g_height)
+		# 缓存父节点引用，避免每帧重复获取
+		if _cached_game_scene == null:
+			_cached_game_scene = _find_game_scene()
+			if _cached_game_scene:
+				var gw = _cached_game_scene.get("grid_width")
+				var gh = _cached_game_scene.get("grid_height")
+				_cached_grid_width = gw if gw != null else 10
+				_cached_grid_height = gh if gh != null else 10
+		
+		if _cached_game_scene:
+			update_move(delta, _cached_game_scene.get_all_worms(), _cached_grid_width, _cached_grid_height)
+
+## 向上遍历找到具有 get_all_worms 方法的祖先节点（GameScene）
+func _find_game_scene() -> Node:
+	var node = get_parent()
+	while node != null:
+		if node.has_method("get_all_worms"):
+			return node
+		node = node.get_parent()
+	return null
+
+## 重置缓存（当父节点改变时调用）
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PARENTED or what == NOTIFICATION_UNPARENTED:
+		_cached_game_scene = null

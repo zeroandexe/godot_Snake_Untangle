@@ -265,8 +265,6 @@ func _load_bg_images() -> void:
 		"res://source/images/backgroup/bg_2.png",
 		"res://source/images/backgroup/bg_3.png",
 		"res://source/images/backgroup/bg_4.png",
-		"res://source/images/backgroup/bg_5.png",
-		"res://source/images/backgroup/bg_6.png",
 	]
 	
 	for path in bg_files:

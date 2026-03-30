@@ -21,6 +21,12 @@ var grid_height: int = 10
 # 箭头指示器（显示可移动方向）
 var direction_arrows: Dictionary = {}  # worm_id -> arrow_node
 
+# === 性能优化：空间哈希网格缓存 ===
+# grid_cache[Vector2i] = worm，用于 O(1) 碰撞检测
+var _grid_cache: Dictionary = {}
+var _free_end_dirty: bool = true  # 自由端状态脏标记
+var _cached_free_worms: Array[Worm] = []  # 缓存的自由端虫子
+
 # 调试配置已移至 debug_config.gd，通过 DebugConfig.SHOW_GRID_LINES 访问
 
 func _ready() -> void:
@@ -137,6 +143,11 @@ func _generate_level() -> void:
 	_clear_worms()
 	_clear_direction_arrows()
 	
+	# 清空网格缓存
+	_grid_cache.clear()
+	_cached_free_worms.clear()
+	_free_end_dirty = true
+	
 	# 生成关卡数据
 	var viewport_size = get_viewport_rect().size
 	var worms_data = level_generator.generate_level(viewport_size)
@@ -149,7 +160,8 @@ func _generate_level() -> void:
 	# 创建方向箭头
 	_create_direction_arrows()
 	
-	# 更新自由端状态
+	# 立即更新自由端状态（确保虫子可以被点击）
+	_free_end_dirty = true
 	_update_free_end_status()
 	
 	# 更新游戏管理器
@@ -193,9 +205,10 @@ func _clear_direction_arrows() -> void:
 	direction_arrows.clear()
 
 ## 清理所有虫子
+## 优化：减少不必要的 is_instance_valid 检查
 func _clear_worms() -> void:
 	for child in worms_container.get_children():
-		if child is Worm and is_instance_valid(child):
+		if child is Worm:
 			_safe_disconnect(child.clicked, _on_worm_clicked)
 			_safe_disconnect(child.move_started, _on_worm_move_started)
 			_safe_disconnect(child.move_failed, _on_worm_move_failed)
@@ -207,56 +220,84 @@ func _clear_worms() -> void:
 			child.queue_free()
 	
 	worms.clear()
+	_cached_free_worms.clear()
+	_grid_cache.clear()
 
 ## 安全断开信号辅助函数
 func _safe_disconnect(sig: Signal, callable: Callable) -> void:
 	if sig.is_connected(callable):
 		sig.disconnect(callable)
 
-## 更新自由端状态
-func _update_free_end_status() -> void:
+## 重建网格空间哈希缓存
+func _rebuild_grid_cache() -> void:
+	_grid_cache.clear()
 	for worm in worms:
-		if not is_instance_valid(worm):
+		if worm.current_state == Worm.State.REMOVED:
 			continue
+		# 只缓存身体部分（不包括头部），用于碰撞检测
+		for i in range(1, worm.grid_positions.size()):
+			_grid_cache[worm.grid_positions[i]] = worm
+
+## 检查网格位置是否被占用（使用空间哈希，O(1)）
+func _is_grid_occupied(grid_pos: Vector2i, exclude_worm: Worm = null) -> bool:
+	var worm = _grid_cache.get(grid_pos)
+	if worm == null:
+		return false
+	if exclude_worm != null and worm == exclude_worm:
+		return false
+	return true
+
+## 更新自由端状态（脏标记版本）
+func _update_free_end_status() -> void:
+	if not _free_end_dirty:
+		return
+	
+	# 重建网格缓存
+	_rebuild_grid_cache()
+	
+	_cached_free_worms.clear()
+	
+	for worm in worms:
 		if worm.current_state != Worm.State.IDLE:
 			continue
 		
-		var is_free = _check_worm_is_free(worm)
+		var is_free = _check_worm_is_free_fast(worm)
 		worm.set_free_end_state(is_free)
+		
+		if is_free:
+			_cached_free_worms.append(worm)
+	
+	_free_end_dirty = false
 	
 	# 更新方向箭头显示
 	_update_direction_arrows()
 
-## 检查虫子是否是自由端
-func _check_worm_is_free(worm: Worm) -> bool:
+## 检查虫子是否是自由端（快速版本，使用空间哈希）
+func _check_worm_is_free_fast(worm: Worm) -> bool:
 	var head = worm.get_head_grid()
 	var tail = worm.get_tail_grid()
 	
-	for other in worms:
-		if not is_instance_valid(other):
-			continue
-		if other == worm or other.current_state == Worm.State.REMOVED:
-			continue
-		
-		# 检查头部是否被其他虫子的身体覆盖（不包括头部）
-		if other.is_grid_on_body(head, true):
-			return false
-		
-		# 检查尾部是否被其他虫子的身体覆盖
-		if other.is_grid_on_body(tail, true):
-			return false
+	# 使用网格缓存进行 O(1) 查询
+	if _is_grid_occupied(head, worm):
+		return false
+	if _is_grid_occupied(tail, worm):
+		return false
 	
 	return true
+
+## 检查虫子是否是自由端（兼容旧版本，用于外部调用）
+func _check_worm_is_free(worm: Worm) -> bool:
+	return _check_worm_is_free_fast(worm)
 
 ## 获取所有虫子（供Worm类调用）
 func get_all_worms() -> Array[Worm]:
 	return worms
 
 ## 更新所有小虫的身体段大小
+## 优化：移除不必要的 is_instance_valid 检查
 func _update_all_worms_body_sizes() -> void:
 	for worm in worms:
-		if is_instance_valid(worm):
-			worm.update_body_sizes()
+		worm.update_body_sizes()
 
 # 输入处理
 func _input(event: InputEvent) -> void:
@@ -317,13 +358,23 @@ func _show_blocked_hint(worm: Worm) -> void:
 	tween.tween_property(worm, "modulate", Color(0.6, 0.6, 0.6, 0.5), 0.15)
 
 ## 获取位置处的虫子
+## 优化：使用预排序的数组，避免每次点击都复制和排序
 func _get_worm_at_position(pos: Vector2) -> Worm:
-	# 从上到下检测（按z_index倒序）
-	var sorted_worms = worms.duplicate()
-	sorted_worms.sort_custom(func(a, b): return a.z_index > b.z_index)
+	# 直接遍历（通常虫子数量不多，无需复杂优化）
+	# 优先检查 IDLE 状态和自由端，快速跳过不可交互的虫子
+	for worm in worms:
+		if worm.current_state != Worm.State.IDLE:
+			continue
+		if not worm.is_free_end:
+			continue
+		if worm.is_point_on_worm(pos):
+			return worm
 	
-	for worm in sorted_worms:
-		if worm.current_state == Worm.State.IDLE and worm.is_point_on_worm(pos):
+	# 如果没有找到可移动的，再检查所有 IDLE 状态的虫子（用于显示被阻挡提示）
+	for worm in worms:
+		if worm.current_state != Worm.State.IDLE:
+			continue
+		if worm.is_point_on_worm(pos):
 			return worm
 	
 	return null
@@ -343,6 +394,7 @@ func _on_worm_move_started(_worm: Worm) -> void:
 ## 虫子移动失败回调（反弹完成后）
 func _on_worm_move_failed(_worm: Worm) -> void:
 	is_input_enabled = true
+	_free_end_dirty = true
 	_update_free_end_status()
 
 ## 虫子反弹回调
@@ -355,15 +407,14 @@ func _on_worm_move_completed(worm: Worm) -> void:
 	_play_success_effect(worm)
 
 ## 虫子被移除回调
+## 优化：简化有效性检查，依赖正常生命周期管理
 func _on_worm_removed(worm: Worm) -> void:
-	if not is_instance_valid(worm):
-		return
 	if not worms.has(worm):
 		return
 	
 	# 移除对应的箭头
 	var arrow = direction_arrows.get(worm.worm_id)
-	if arrow and is_instance_valid(arrow):
+	if arrow:
 		arrow.queue_free()
 	direction_arrows.erase(worm.worm_id)
 	
@@ -372,6 +423,9 @@ func _on_worm_removed(worm: Worm) -> void:
 	
 	# 减少计数
 	GameManager.remaining_worms = max(0, GameManager.remaining_worms - 1)
+	
+	# 标记脏标记
+	_free_end_dirty = true
 	
 	_update_ui()
 	
@@ -474,10 +528,13 @@ func _show_victory_ui() -> void:
 func _process(delta: float) -> void:
 	# 更新虫子的移动
 	var all_moving_done = true
+	var any_state_changed = false
 	
 	for worm in worms:
 		if not is_instance_valid(worm):
 			continue
+		
+		var prev_state = worm.current_state
 		
 		if worm.current_state == Worm.State.MOVING:
 			all_moving_done = false
@@ -485,6 +542,14 @@ func _process(delta: float) -> void:
 		elif worm.current_state == Worm.State.REVERSING:
 			all_moving_done = false
 			worm.update_move(delta, worms, grid_width, grid_height)
+		
+		# 检测状态变化，标记脏标记
+		if worm.current_state != prev_state and prev_state != Worm.State.IDLE:
+			any_state_changed = true
+	
+	# 如果有状态变化，标记自由端需要重新计算
+	if any_state_changed:
+		_free_end_dirty = true
 	
 	# 如果所有移动都完成了，重新启用输入
 	if is_input_enabled == false and all_moving_done:

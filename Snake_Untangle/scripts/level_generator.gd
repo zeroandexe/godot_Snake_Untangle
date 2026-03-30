@@ -48,27 +48,39 @@ func set_grid_height(height: int) -> void:
 	grid_height = height
 
 ## 生成关卡数据
-func generate_level(screen_size: Vector2) -> Array[Dictionary]:
-	generated_worms.clear()
-	solution_order.clear()
+## 优化：使用迭代替代递归，避免栈溢出
+func generate_level(_screen_size: Vector2) -> Array[Dictionary]:
+	var max_attempts = 100  # 最大尝试次数，防止无限循环
+	var attempt = 0
 	
-	# 步骤1: 生成解开状态（所有虫子不交叉）
-	var solved_state = _generate_solved_state()
+	while attempt < max_attempts:
+		attempt += 1
+		generated_worms.clear()
+		solution_order.clear()
+		
+		# 步骤1: 生成解开状态（所有虫子不交叉）
+		var solved_state = _generate_solved_state()
+		
+		# 步骤2: 添加一些随机交叉（根据复杂度）
+		var stacked_state = _add_crossings(solved_state)
+		
+		# 步骤3: 验证可解性
+		if _verify_solvability(stacked_state):
+			print("关卡生成成功，尝试次数: ", attempt)
+			return stacked_state
+		
+		# 如果不可解，继续下一次尝试
+		print("关卡验证失败，第 ", attempt, " 次尝试，重新生成...")
 	
-	# 步骤2: 添加一些随机交叉（根据复杂度）
-	var stacked_state = _add_crossings(solved_state)
-	
-	# 步骤3: 验证可解性
-	if not _verify_solvability(stacked_state):
-		# 如果不可解，重新生成
-		return generate_level(screen_size)
-	
-	return stacked_state
+	# 如果多次尝试都失败，返回最后一次生成的状态（可能不可解，但至少不会崩溃）
+	push_warning("关卡生成：达到最大尝试次数 " + str(max_attempts) + "，返回最后生成的关卡")
+	return generated_worms
 
 ## 生成解开状态（铺满整个界面，避开最外层）
+## 优化版本：使用 Dictionary 替代 Array 进行 O(1) 占用检测
 func _generate_solved_state() -> Array[Dictionary]:
 	var worms: Array[Dictionary] = []
-	var occupied_grids: Array[Vector2i] = []
+	var occupied_grids: Dictionary = {}  # 使用 Dictionary 替代 Array，O(1) 查找
 	
 	# 计算可用网格数量（避开最外层）
 	var available_width = grid_width - 2
@@ -84,12 +96,12 @@ func _generate_solved_state() -> Array[Dictionary]:
 		attempts += 1
 		
 		# 随机选择一个起始位置（不在已占用的网格上）
-		var start_pos = _find_random_free_position(occupied_grids)
+		var start_pos = _find_random_free_position_fast(occupied_grids)
 		if start_pos == Vector2i(-1, -1):
 			break  # 没有可用位置了
 		
-		# 生成虫子路径
-		var path = _generate_worm_path_random(start_pos, occupied_grids)
+		# 生成虫子路径（使用 Dictionary 版本）
+		var path = _generate_worm_path_fast(start_pos, occupied_grids)
 		
 		if path.size() >= MIN_WORM_SEGMENTS:
 			var worm_data: Dictionary = {
@@ -101,16 +113,16 @@ func _generate_solved_state() -> Array[Dictionary]:
 			
 			worms.append(worm_data)
 			
-			# 标记这些网格为已占用
+			# 标记这些网格为已占用（O(1)）
 			for pos in path:
-				occupied_grids.append(pos)
+				occupied_grids[pos] = true
 	
 	print("生成了 ", worms.size(), " 条小虫，覆盖了 ", occupied_grids.size(), " / ", available_grids, " 个可用网格（避开最外层）")
 	
 	return worms
 
-## 随机寻找一个空闲位置（避开最外层）
-func _find_random_free_position(occupied: Array[Vector2i]) -> Vector2i:
+## 随机寻找一个空闲位置（避开最外层）- 快速版
+func _find_random_free_position_fast(occupied: Dictionary) -> Vector2i:
 	var attempts = 0
 	var max_attempts = 100
 	
@@ -122,14 +134,25 @@ func _find_random_free_position(occupied: Array[Vector2i]) -> Vector2i:
 		var y = randi() % (grid_height - 2) + 1
 		var pos = Vector2i(x, y)
 		
-		if not pos in occupied:
+		# Dictionary 的 O(1) 查找
+		if not occupied.has(pos):
 			return pos
 	
 	return Vector2i(-1, -1)
 
-## 生成单条虫子的路径（随机方向和长度，避开最外层）
-func _generate_worm_path_random(start: Vector2i, occupied: Array[Vector2i]) -> Array[Vector2i]:
+## 兼容旧版本（保持接口）
+func _find_random_free_position(occupied: Array[Vector2i]) -> Vector2i:
+	# 转换为 Dictionary 以使用快速版本
+	var dict: Dictionary = {}
+	for pos in occupied:
+		dict[pos] = true
+	return _find_random_free_position_fast(dict)
+
+## 生成单条虫子的路径（随机方向和长度，避开最外层）- 快速版
+## 使用 Dictionary 进行 O(1) 占用检测
+func _generate_worm_path_fast(start: Vector2i, occupied: Dictionary) -> Array[Vector2i]:
 	var path: Array[Vector2i] = [start]
+	var path_set: Dictionary = {start: true}  # 用于 O(1) 自交检测
 	var current = start
 	
 	# 随机选择初始方向
@@ -153,18 +176,27 @@ func _generate_worm_path_random(start: Vector2i, occupied: Array[Vector2i]) -> A
 		if next.x < 1 or next.x >= grid_width - 1 or next.y < 1 or next.y >= grid_height - 1:
 			continue
 		
-		# 检查是否与其他虫子重叠
-		if next in occupied:
+		# 检查是否与其他虫子重叠（Dictionary O(1)）
+		if occupied.has(next):
 			continue
 		
-		# 检查是否自交
-		if next in path:
+		# 检查是否自交（Dictionary O(1)）
+		if path_set.has(next):
 			continue
 		
 		path.append(next)
+		path_set[next] = true
 		current = next
 	
 	return path
+
+## 兼容旧版本（保持接口）
+func _generate_worm_path_random(start: Vector2i, occupied: Array[Vector2i]) -> Array[Vector2i]:
+	# 转换为 Dictionary
+	var dict: Dictionary = {}
+	for pos in occupied:
+		dict[pos] = true
+	return _generate_worm_path_fast(start, dict)
 
 ## 获取随机方向
 func _get_random_direction() -> Vector2i:
@@ -199,7 +231,7 @@ func _add_crossings(worms_data: Array[Dictionary]) -> Array[Dictionary]:
 	
 	return result
 
-## 验证可解性
+## 验证可解性（优化版：使用空间哈希）
 func _verify_solvability(worms_data: Array[Dictionary]) -> bool:
 	# 创建临时Worm对象进行验证
 	var temp_worms: Array[Worm] = []
@@ -220,8 +252,14 @@ func _verify_solvability(worms_data: Array[Dictionary]) -> bool:
 		max_iterations -= 1
 		var found_free = false
 		
+		# 重建网格缓存（剩余虫子）
+		var grid_cache: Dictionary = {}
+		for w in remaining:
+			for i in range(1, w.grid_positions.size()):
+				grid_cache[w.grid_positions[i]] = w
+		
 		for worm in remaining:
-			if _is_worm_free(worm, remaining):
+			if _is_worm_free_fast(worm, grid_cache):
 				removal_order.append(worm.worm_id)
 				remaining.erase(worm)
 				found_free = true
@@ -235,22 +273,38 @@ func _verify_solvability(worms_data: Array[Dictionary]) -> bool:
 	solution_order = removal_order
 	return true
 
-## 检查虫子是否是自由端
-func _is_worm_free(worm: Worm, all_worms: Array[Worm]) -> bool:
+## 检查虫子是否是自由端（快速版：使用空间哈希）
+## Bug修复：需要排除虫子自己的身体，只检查是否被其他虫子覆盖
+func _is_worm_free_fast(worm: Worm, grid_cache: Dictionary) -> bool:
 	var head = worm.get_head_grid()
 	var tail = worm.get_tail_grid()
 	
-	for other in all_worms:
-		if other == worm:
-			continue
-		
-		# 检查头部或尾部是否被其他虫子的身体覆盖
-		if other.is_grid_on_body(head, true):  # true: 不包括其他虫子的头部
+	# 使用 Dictionary 进行 O(1) 查询
+	# 检查头部是否被其他虫子（不是自己）占用
+	if grid_cache.has(head):
+		var occupant = grid_cache[head]
+		if occupant != worm:
 			return false
-		if other.is_grid_on_body(tail, true):
+	
+	# 检查尾部是否被其他虫子（不是自己）占用
+	if grid_cache.has(tail):
+		var occupant = grid_cache[tail]
+		if occupant != worm:
 			return false
 	
 	return true
+
+## 检查虫子是否是自由端（兼容旧版）
+func _is_worm_free(worm: Worm, all_worms: Array[Worm]) -> bool:
+	# 构建网格缓存
+	var grid_cache: Dictionary = {}
+	for other in all_worms:
+		if other == worm:
+			continue
+		for i in range(1, other.grid_positions.size()):
+			grid_cache[other.grid_positions[i]] = other
+	
+	return _is_worm_free_fast(worm, grid_cache)
 
 ## 清理临时虫子
 func _cleanup_temp_worms(worms: Array[Worm]) -> void:

@@ -9,10 +9,10 @@ extends Node
 # ============================================
 
 ## 显示网格线（调试用）
-static var SHOW_GRID_LINES: bool = true
+static var SHOW_GRID_LINES: bool = false
 
 ## 显示游戏区域边界框
-static var SHOW_GAME_AREA_BORDER: bool = true
+static var SHOW_GAME_AREA_BORDER: bool = false
 
 ## 显示虫子碰撞形状
 static var SHOW_COLLISION_SHAPES: bool = false
@@ -21,7 +21,7 @@ static var SHOW_COLLISION_SHAPES: bool = false
 static var SHOW_DIRECTION_ARROWS: bool = false
 
 ## 禁用背景图片（显示黑色背景，便于查看网格线）
-static var DISABLE_BACKGROUND_IMAGES: bool = true
+static var DISABLE_BACKGROUND_IMAGES: bool = false
 
 # ============================================
 # 日志调试开关
