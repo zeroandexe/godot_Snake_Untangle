@@ -12,6 +12,10 @@ extends CanvasLayer
 @onready var victory_menu: Control = $Menus/VictoryMenu
 @onready var main_menu: Control = $Menus/MainMenu
 
+# 设置菜单节点（运行时创建）
+var settings_menu: Control = null
+var temp_start_level: int = 1
+
 # 特效
 @onready var flash_effect: ColorRect = $Effects/FlashEffect
 
@@ -70,12 +74,19 @@ func show_victory() -> void:
 
 # 按钮回调
 func _set_game_background_visible(visible: bool) -> void:
-	if game_background:
-		game_background.visible = visible
+	if not game_background:
+		return
+	
+	# 如果禁用了背景图片，始终隐藏
+	if DebugConfig.DISABLE_BACKGROUND_IMAGES:
+		game_background.visible = false
+		return
+	
+	game_background.visible = visible
 
 func _on_settings_pressed() -> void:
-	# TODO: 显示设置菜单
 	GameManager.play_sound("select")
+	_show_settings_menu()
 
 func _on_next_level_pressed() -> void:
 	if victory_menu:
@@ -114,15 +125,26 @@ func _update_menu_buttons() -> void:
 		continue_btn.disabled = not has_save
 		continue_btn.modulate = Color(1, 1, 1, 1.0 if has_save else 0.3)
 
-## 开始新游戏（清除存档）
+## 开始新游戏（使用设置的起始关卡）
 func _on_new_game_pressed() -> void:
 	GameManager.play_sound("select")
 	
-	# 清除存档数据
-	SaveManager.reset_save()
+	# 获取设置的起始关卡
+	var start_level = GameManager.get_start_level()
 	
-	# 重置游戏管理器状态
-	GameManager.current_level = 1
+	# 清除存档数据，但保留设置
+	var current_settings = GameManager.settings.duplicate()
+	SaveManager.reset_save()
+	GameManager.settings = current_settings
+	
+	# 重新保存设置，确保 start_level 被正确保存
+	SaveManager.save_game({
+		"current_level": start_level,  # 使用起始关卡作为当前关卡
+		"settings": GameManager.settings,
+	})
+	
+	# 设置当前关卡为起始关卡
+	GameManager.current_level = start_level
 	
 	# 隐藏菜单，显示游戏
 	if main_menu:
@@ -134,7 +156,7 @@ func _on_new_game_pressed() -> void:
 	# 获取游戏场景并开始
 	game_scene = get_node_or_null("../GameScene")
 	if game_scene:
-		GameManager.start_level(1)
+		GameManager.start_level(start_level)
 
 ## 继续游戏
 func _on_continue_pressed() -> void:
@@ -159,3 +181,157 @@ func _on_level_started(_level: int) -> void:
 	if main_menu:
 		main_menu.visible = false
 	_set_game_background_visible(true)
+
+## ==================== 设置菜单 ====================
+
+## 显示设置菜单
+func _show_settings_menu() -> void:
+	if settings_menu:
+		settings_menu.visible = true
+		return
+	
+	# 创建设置菜单
+	_create_settings_menu()
+
+## 创建设置菜单UI
+func _create_settings_menu() -> void:
+	settings_menu = Control.new()
+	settings_menu.name = "SettingsMenu"
+	settings_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
+	
+	# 半透明背景
+	var overlay = ColorRect.new()
+	overlay.name = "Overlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.color = Color(0, 0, 0, 0.8)
+	settings_menu.add_child(overlay)
+	
+	# 面板 - 使用居中锚点实现响应式布局
+	var panel = Panel.new()
+	panel.name = "Panel"
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	# 使用相对尺寸而非绝对像素
+	panel.custom_minimum_size = Vector2(400, 400)
+	settings_menu.add_child(panel)
+	
+	# 创建垂直容器来管理所有元素
+	var vbox = VBoxContainer.new()
+	vbox.name = "VBoxContainer"
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 20)
+	panel.add_child(vbox)
+	
+	# 标题
+	var title_label = Label.new()
+	title_label.name = "TitleLabel"
+	title_label.text = "游戏设置"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 36)
+	vbox.add_child(title_label)
+	
+	# 起始关卡标签
+	var level_title = Label.new()
+	level_title.name = "LevelTitle"
+	level_title.text = "起始关卡"
+	level_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_title.add_theme_font_size_override("font_size", 28)
+	vbox.add_child(level_title)
+	
+	# 当前关卡显示
+	var level_value = Label.new()
+	level_value.name = "LevelValue"
+	level_value.text = str(GameManager.get_start_level())
+	level_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_value.add_theme_font_size_override("font_size", 48)
+	vbox.add_child(level_value)
+	
+	# 按钮容器（水平布局）
+	var button_container = HBoxContainer.new()
+	button_container.name = "ButtonContainer"
+	button_container.add_theme_constant_override("separation", 20)
+	vbox.add_child(button_container)
+	
+	# 左侧占位
+	var left_spacer = Control.new()
+	left_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button_container.add_child(left_spacer)
+	
+	# 减号按钮 - 使用容器布局
+	var minus_btn = Button.new()
+	minus_btn.name = "MinusButton"
+	minus_btn.text = "-"
+	minus_btn.custom_minimum_size = Vector2(60, 60)
+	minus_btn.add_theme_font_size_override("font_size", 32)
+	minus_btn.pressed.connect(_on_level_minus)
+	button_container.add_child(minus_btn)
+	
+	# 加号按钮 - 使用容器布局
+	var plus_btn = Button.new()
+	plus_btn.name = "PlusButton"
+	plus_btn.text = "+"
+	plus_btn.custom_minimum_size = Vector2(60, 60)
+	plus_btn.add_theme_font_size_override("font_size", 32)
+	plus_btn.pressed.connect(_on_level_plus)
+	button_container.add_child(plus_btn)
+	
+	# 右侧占位
+	var right_spacer = Control.new()
+	right_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button_container.add_child(right_spacer)
+	
+	# 说明文字
+	var desc_label = Label.new()
+	desc_label.name = "DescLabel"
+	desc_label.text = "设置后点击'开始新游戏'\n将从该关卡开始"
+	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_label.add_theme_font_size_override("font_size", 20)
+	vbox.add_child(desc_label)
+	
+	# 底部占位
+	var bottom_spacer = Control.new()
+	bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(bottom_spacer)
+	
+	# 返回按钮 - 使用容器布局
+	var back_btn = Button.new()
+	back_btn.name = "BackButton"
+	back_btn.text = "返回主菜单"
+	back_btn.custom_minimum_size = Vector2(200, 50)
+	back_btn.add_theme_font_size_override("font_size", 28)
+	back_btn.pressed.connect(_on_settings_back)
+	vbox.add_child(back_btn)
+	
+	# 添加到场景
+	$Menus.add_child(settings_menu)
+
+## 关卡减
+func _on_level_minus() -> void:
+	GameManager.play_sound("select")
+	var current = GameManager.get_start_level()
+	if current > 1:
+		GameManager.set_start_level(current - 1)
+		_update_settings_level_display()
+
+## 关卡加
+func _on_level_plus() -> void:
+	GameManager.play_sound("select")
+	var current = GameManager.get_start_level()
+	if current < 999:
+		GameManager.set_start_level(current + 1)
+		_update_settings_level_display()
+
+## 更新设置菜单中的关卡显示
+func _update_settings_level_display() -> void:
+	if not settings_menu:
+		return
+	var level_value = settings_menu.get_node_or_null("Panel/VBoxContainer/LevelValue")
+	if level_value:
+		level_value.text = str(GameManager.get_start_level())
+
+## 返回主菜单
+func _on_settings_back() -> void:
+	GameManager.play_sound("select")
+	if settings_menu:
+		settings_menu.visible = false

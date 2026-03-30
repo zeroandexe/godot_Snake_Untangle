@@ -24,6 +24,7 @@ var settings: Dictionary = {
 	"sound_volume": 0.8,
 	"vibration_enabled": true,
 	"colorblind_mode": false,
+	"start_level": 1,  # 起始关卡设置
 }
 
 # 关卡数据
@@ -33,6 +34,7 @@ var remaining_worms: int = 0
 # 音效资源
 var collision_sound: AudioStream = preload("res://source/sound/effects/worm_collision.wav")
 var death_sound: AudioStream = preload("res://source/sound/effects/worm_death.wav")
+var select_sound: AudioStream = preload("res://source/sound/effects/worm_select.wav")
 
 # BGM
 var bgm_player: AudioStreamPlayer
@@ -84,6 +86,18 @@ func _save_progress() -> void:
 		"settings": settings,
 	})
 
+## 获取起始关卡设置
+func get_start_level() -> int:
+	return settings.get("start_level", 1)
+
+## 设置起始关卡
+func set_start_level(level: int) -> void:
+	if level < 1:
+		level = 1
+	settings.start_level = level
+	_save_progress()
+	print("起始关卡已设置为: ", level)
+
 ## 加载设置
 func _load_settings() -> void:
 	var data = SaveManager.load_game()
@@ -95,6 +109,13 @@ func _load_settings() -> void:
 			if vol <= 0.0 or vol > 1.0:
 				settings.sound_volume = 0.8
 				print("音量值无效，重置为默认值: 0.8")
+		# 验证起始关卡有效
+		if settings.has("start_level"):
+			var start_lvl = settings.start_level
+			if start_lvl < 1 or start_lvl > 1000:
+				settings.start_level = 1
+		else:
+			settings.start_level = 1
 	if data.has("current_level"):
 		current_level = data.current_level
 
@@ -108,7 +129,7 @@ func play_sound(type: String) -> void:
 	
 	match type:
 		"select":
-			player.stream = _generate_tone(440.0, 0.1, 0.3)
+			player.stream = select_sound
 		"move":
 			player.stream = _generate_tone(523.0, 0.15, 0.2)
 		"success":

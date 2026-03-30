@@ -21,15 +21,17 @@ var grid_height: int = 10
 # 箭头指示器（显示可移动方向）
 var direction_arrows: Dictionary = {}  # worm_id -> arrow_node
 
-# 调试选项
-var show_grid_lines: bool = false  # 设为true可显示网格线（调试用）
+# 调试配置已移至 debug_config.gd，通过 DebugConfig.SHOW_GRID_LINES 访问
 
 func _ready() -> void:
+	# 连接信号
+	GameManager.level_started.connect(_on_level_started)
+	
 	# 初始化关卡生成器
 	level_generator = LevelGenerator.new(GameManager.current_level)
 	var grid_size = level_generator.get_grid_size()
 	grid_width = grid_size.width
-	grid_height = grid_size.height
+	# 注意：grid_height 由 _calculate_grid_size 根据屏幕尺寸动态计算
 	
 	# 根据屏幕尺寸和网格数量动态计算框格尺寸，确保覆盖整个游戏画面
 	_calculate_grid_size()
@@ -44,28 +46,74 @@ func _ready() -> void:
 	# 延迟更新UI
 	call_deferred("_update_ui")
 	
-	# 连接信号
-	GameManager.level_started.emit(GameManager.current_level)
-	
 	# 绘制游戏区域边界（可视化调试）
-	_draw_game_area_border()
+	call_deferred("_draw_game_area_border")
 	
 	# 设置随机背景
 	_update_background()
 
-## 计算网格单元大小，确保覆盖整个游戏画面
+
+## 关卡开始信号回调 - 重新生成关卡
+func _on_level_started(level: int) -> void:
+	# 清除现有关卡
+	_clear_worms()
+	_clear_direction_arrows()
+	
+	# 重新初始化关卡生成器
+	level_generator = LevelGenerator.new(level)
+	var grid_size = level_generator.get_grid_size()
+	grid_width = grid_size.width
+	
+	# 重新计算网格大小
+	_calculate_grid_size()
+	
+	# 调整相机
+	_adjust_camera()
+	_draw_grid_lines()
+	
+	# 生成新关卡
+	_generate_level()
+	
+	# 更新UI
+	_update_ui()
+	
+	# 更新背景
+	_update_background()
+
+## 计算网格单元大小
+## 每个网格是正方形，宽度填满屏幕，高度方向第一行和最后一行分配余数
 func _calculate_grid_size() -> void:
 	var viewport_size = get_viewport_rect().size
 	
-	# 计算每个网格单元的大小，使游戏区域覆盖整个屏幕
-	# X和Y方向分别计算，支持非正方形网格
-	Worm.GRID_SIZE_X = viewport_size.x / grid_width
-	Worm.GRID_SIZE_Y = viewport_size.y / grid_height
+	# 根据宽度计算基准网格尺寸（正方形）
+	var base_grid_size: float = viewport_size.x / grid_width
+	
+	# 计算高度方向能容纳多少完整网格
+	var full_rows: int = int(viewport_size.y / base_grid_size)
+	
+	# 计算余数（多出来的高度）
+	var remainder: float = viewport_size.y - full_rows * base_grid_size
+	
+	# 设置网格参数
+	Worm.GRID_SIZE_X = base_grid_size
+	Worm.GRID_SIZE_Y = base_grid_size
+	Worm.GRID_SIZE = base_grid_size
+	Worm.GRID_HEIGHT = full_rows
+	Worm.FIRST_ROW_EXTRA = remainder / 2
+	Worm.LAST_ROW_EXTRA = remainder / 2
+	
+	# 更新本地网格高度变量（用于其他计算）
+	grid_height = full_rows
+	
+	# 更新 level_generator 的高度（用于蛇的生成和移动边界）
+	if level_generator:
+		level_generator.set_grid_height(full_rows)
 	
 	print("屏幕尺寸: ", viewport_size)
-	print("网格数量: ", grid_width, "x", grid_height)
-	print("计算出的 GRID_SIZE_X: ", Worm.GRID_SIZE_X)
-	print("计算出的 GRID_SIZE_Y: ", Worm.GRID_SIZE_Y)
+	print("网格宽度: ", grid_width, " 网格高度: ", grid_height)
+	print("基准网格尺寸: ", base_grid_size)
+	print("第一行额外高度: ", Worm.FIRST_ROW_EXTRA)
+	print("最后一行额外高度: ", Worm.LAST_ROW_EXTRA)
 	
 	# 更新所有小虫的身体段大小
 	_update_all_worms_body_sizes()
@@ -76,9 +124,10 @@ func _adjust_camera() -> void:
 	if not camera:
 		return
 	
-	# 计算网格中心
-	var grid_center = Vector2(grid_width * Worm.GRID_SIZE_X, grid_height * Worm.GRID_SIZE_Y) / 2
-	camera.position = grid_center
+	var viewport_size = get_viewport_rect().size
+	
+	# 相机位于屏幕中心
+	camera.position = viewport_size / 2
 	
 	# 游戏区域已覆盖整个屏幕，使用1.0缩放
 	camera.zoom = Vector2(1.0, 1.0)
@@ -359,11 +408,11 @@ func _level_completed() -> void:
 	
 	GameManager.current_level += 1
 	
-	# 重新创建关卡生成器以获取新的网格大小
+	# 重新创建关卡生成器以获取新的网格宽度
 	level_generator = LevelGenerator.new(GameManager.current_level)
 	var grid_size = level_generator.get_grid_size()
 	grid_width = grid_size.width
-	grid_height = grid_size.height
+	# 注意：高度由 _calculate_grid_size 根据屏幕尺寸动态计算
 	
 	# 重新计算框格尺寸（网格数量改变，框格大小会自动调整以覆盖屏幕）
 	_calculate_grid_size()
@@ -389,13 +438,21 @@ func _get_ui_layer() -> CanvasLayer:
 
 ## 更新背景图片
 func _update_background() -> void:
+	var bg_node = get_node_or_null("../GameBackground") as TextureRect
+	if not bg_node:
+		return
+	
+	# 如果禁用了背景图片，显示黑色背景（便于查看网格线）
+	if DebugConfig.DISABLE_BACKGROUND_IMAGES:
+		bg_node.visible = false
+		return
+	
 	var bg_texture = GameManager.get_random_background()
 	if bg_texture == null:
 		return
-	var bg_node = get_node_or_null("../GameBackground") as TextureRect
-	if bg_node:
-		bg_node.texture = bg_texture
-		bg_node.visible = true
+	
+	bg_node.texture = bg_texture
+	bg_node.visible = true
 
 ## 更新UI
 func _update_ui() -> void:
@@ -445,6 +502,7 @@ func _process(delta: float) -> void:
 	_update_direction_arrows()
 
 ## 绘制网格线（调试用，默认不显示）
+## 支持第一行和最后一行的额外高度
 func _draw_grid_lines() -> void:
 	var grid_lines = get_node_or_null("../GridLines")
 	if not grid_lines:
@@ -454,10 +512,12 @@ func _draw_grid_lines() -> void:
 	for child in grid_lines.get_children():
 		child.queue_free()
 	
-	if not show_grid_lines:
+	if not DebugConfig.SHOW_GRID_LINES:
 		return
 	
-	# 绘制垂直线
+	var viewport_size = get_viewport_rect().size
+	
+	# 绘制垂直线（垂直线不受高度调整影响）
 	for x in range(grid_width + 1):
 		var line = Line2D.new()
 		line.width = 1.0
@@ -465,37 +525,55 @@ func _draw_grid_lines() -> void:
 		
 		var points: PackedVector2Array = []
 		points.append(Vector2(x * Worm.GRID_SIZE_X, 0))
-		points.append(Vector2(x * Worm.GRID_SIZE_X, grid_height * Worm.GRID_SIZE_Y))
+		points.append(Vector2(x * Worm.GRID_SIZE_X, viewport_size.y))
 		line.points = points
 		
 		grid_lines.add_child(line)
 	
-	# 绘制水平线
+	# 绘制水平线（需要考虑第一行和最后一行的额外高度）
+	var current_y: float = 0
+	
 	for y in range(grid_height + 1):
 		var line = Line2D.new()
 		line.width = 1.0
 		line.default_color = Color(0.2, 0.2, 0.2, 0.3)
 		
 		var points: PackedVector2Array = []
-		points.append(Vector2(0, y * Worm.GRID_SIZE_Y))
-		points.append(Vector2(grid_width * Worm.GRID_SIZE_X, y * Worm.GRID_SIZE_Y))
+		points.append(Vector2(0, current_y))
+		points.append(Vector2(viewport_size.x, current_y))
 		line.points = points
 		
 		grid_lines.add_child(line)
-
-
-## 绘制游戏区域边界（可视化调试）
+		
+		# 计算下一行的 Y 坐标
+		if y == 0:
+			# 第一行底部 = 第一行额外高度 + 基准高度
+			current_y += Worm.FIRST_ROW_EXTRA + Worm.GRID_SIZE
+		elif y == grid_height - 1:
+			# 最后一行底部 = 最后一行额外高度 + 基准高度
+			current_y += Worm.LAST_ROW_EXTRA + Worm.GRID_SIZE
+		else:
+			# 中间行 = 基准高度
+			current_y += Worm.GRID_SIZE
+	
+	
+	## 绘制游戏区域边界（可视化调试）
 func _draw_game_area_border() -> void:
+	if not DebugConfig.SHOW_GAME_AREA_BORDER:
+		return
+	
+	var viewport_size = get_viewport_rect().size
+	
 	var border = Line2D.new()
 	border.name = "GameAreaBorder"
 	border.width = 3.0
 	border.default_color = Color(0.5, 0.5, 0.5, 0.5)  # 半透明灰色
 	
-	# 计算游戏区域的四个角
+	# 游戏区域就是整个屏幕
 	var top_left = Vector2(0, 0)
-	var top_right = Vector2(grid_width * Worm.GRID_SIZE_X, 0)
-	var bottom_right = Vector2(grid_width * Worm.GRID_SIZE_X, grid_height * Worm.GRID_SIZE_Y)
-	var bottom_left = Vector2(0, grid_height * Worm.GRID_SIZE_Y)
+	var top_right = Vector2(viewport_size.x, 0)
+	var bottom_right = Vector2(viewport_size.x, viewport_size.y)
+	var bottom_left = Vector2(0, viewport_size.y)
 	
 	# 绘制矩形边界
 	var points: PackedVector2Array = [

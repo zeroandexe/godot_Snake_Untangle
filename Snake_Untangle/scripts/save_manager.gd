@@ -63,6 +63,7 @@ func _get_default_data() -> Dictionary:
 			"sound_volume": 0.8,
 			"vibration_enabled": true,
 			"colorblind_mode": false,
+			"start_level": 1,  # 起始关卡设置
 		},
 		"level_stats": {},
 	}

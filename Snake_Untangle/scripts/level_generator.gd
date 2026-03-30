@@ -24,12 +24,13 @@ func _init(level: int = 1) -> void:
 	_set_difficulty(level)
 
 ## 设置难度
-## 每过一关网格大小增加1（10x10 -> 11x11 -> 12x12...）
+## 每过一关宽度增加1（10 -> 11 -> 12...）
+## 高度由屏幕尺寸动态决定，不在此处设置
 func _set_difficulty(level: int) -> void:
-	# 网格大小随关卡增加
-	var grid_size = BASE_GRID_SIZE + (level - 1)
-	grid_width = grid_size
-	grid_height = grid_size
+	# 网格宽度随关卡增加
+	grid_width = BASE_GRID_SIZE + (level - 1)
+	# 高度初始化为与宽度相同，但实际由屏幕尺寸决定
+	grid_height = grid_width
 	
 	# 根据关卡数设置复杂度（影响交叉程度）
 	if level <= 5:
@@ -41,6 +42,10 @@ func _set_difficulty(level: int) -> void:
 	
 	# 小虫数量不再固定，而是根据覆盖率动态生成
 	worm_count = 0  # 将在生成时动态计算
+
+## 设置网格高度（由游戏场景根据屏幕尺寸调用）
+func set_grid_height(height: int) -> void:
+	grid_height = height
 
 ## 生成关卡数据
 func generate_level(screen_size: Vector2) -> Array[Dictionary]:

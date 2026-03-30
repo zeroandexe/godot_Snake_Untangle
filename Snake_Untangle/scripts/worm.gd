@@ -15,6 +15,10 @@ signal move_reversed(worm: Worm)  # 新增：反弹信号
 # 常量
 static var GRID_SIZE_X: float = 40.0  # 网格单元X方向大小（动态计算，覆盖整个屏幕）
 static var GRID_SIZE_Y: float = 40.0  # 网格单元Y方向大小（动态计算，覆盖整个屏幕）
+static var GRID_SIZE: float = 40.0    # 基准网格尺寸（正方形）
+static var GRID_HEIGHT: int = 10      # 高度方向网格数量
+static var FIRST_ROW_EXTRA: float = 0.0  # 第一行额外高度
+static var LAST_ROW_EXTRA: float = 0.0   # 最后一行额外高度
 const MIN_SEGMENTS: int = 5  # 最小长度
 const MAX_SEGMENTS: int = 15  # 最大长度
 
@@ -52,7 +56,7 @@ var segment_count: int = 0
 var move_direction: Vector2i = Vector2i.RIGHT
 
 # 视觉节点
-var body_segments: Array[Polygon2D] = []  # 身体段（包括头）
+var body_segments: Array[Node2D] = []  # 身体段（包括头）
 var head_triangle: Polygon2D = null  # 三角形头部
 
 # 属性
@@ -82,8 +86,8 @@ func _ready() -> void:
 
 ## 动态计算身体段大小（根据框格尺寸）
 func _calculate_body_sizes() -> void:
-	# 使用较小的框格尺寸作为基准，确保小虫在两个方向都能完整显示
-	var base_grid_size = min(GRID_SIZE_X, GRID_SIZE_Y)
+	# 使用基准网格尺寸（正方形）
+	var base_grid_size = GRID_SIZE
 	
 	HEAD_SIZE = base_grid_size * HEAD_SIZE_RATIO
 	BODY_SIZE = base_grid_size * BODY_SIZE_RATIO
@@ -296,13 +300,54 @@ func _get_perpendicular_directions(dir: Vector2i) -> Array[Vector2i]:
 	else:  # 垂直移动，返回水平方向
 		return [Vector2i.RIGHT, Vector2i.LEFT]
 
-## 网格坐标转世界坐标
+## 网格坐标转世界坐标（框格中心）
+## 支持第一行和最后一行的额外高度
 func _grid_to_world(grid_pos: Vector2i) -> Vector2:
-	return Vector2(grid_pos.x * GRID_SIZE_X, grid_pos.y * GRID_SIZE_Y)
+	var world_x: float = grid_pos.x * GRID_SIZE_X + GRID_SIZE_X / 2
+	var world_y: float = _calculate_world_y(grid_pos.y)
+	return Vector2(world_x, world_y)
+
+## 计算指定行的 Y 世界坐标（行中心）
+static func calculate_row_center_y(row: int) -> float:
+	if row == 0:
+		# 第一行：额外高度的一半 + 基准尺寸的一半
+		return FIRST_ROW_EXTRA / 2 + GRID_SIZE / 2
+	elif row == GRID_HEIGHT - 1:
+		# 最后一行：先计算前面所有行的高度，再加上最后一行额外高度的一半和基准尺寸的一半
+		var y: float = FIRST_ROW_EXTRA + (GRID_HEIGHT - 2) * GRID_SIZE + LAST_ROW_EXTRA / 2 + GRID_SIZE / 2
+		return y
+	else:
+		# 中间行：第一行总高度 + (row-1) * 基准高度 + 基准高度的一半
+		var y: float = FIRST_ROW_EXTRA + (row - 1) * GRID_SIZE + GRID_SIZE / 2
+		return y
+
+## 实例方法，调用静态方法
+func _calculate_world_y(row: int) -> float:
+	return calculate_row_center_y(row)
 
 ## 世界坐标转网格坐标
+## 注意：需要考虑第一行和最后一行的额外高度
 func world_to_grid(world_pos: Vector2) -> Vector2i:
-	return Vector2i(int(world_pos.x / GRID_SIZE_X), int(world_pos.y / GRID_SIZE_Y))
+	var grid_x: int = int(world_pos.x / GRID_SIZE_X)
+	var grid_y: int = _calculate_grid_y(world_pos.y)
+	return Vector2i(grid_x, grid_y)
+
+## 根据世界坐标 Y 计算网格行号
+func _calculate_grid_y(world_y: float) -> int:
+	# 检查是否在第一行
+	var first_row_end: float = FIRST_ROW_EXTRA + GRID_SIZE
+	if world_y < first_row_end:
+		return 0
+	
+	# 检查是否在最后一行
+	var last_row_start: float = FIRST_ROW_EXTRA + (GRID_HEIGHT - 2) * GRID_SIZE
+	if world_y >= last_row_start:
+		return GRID_HEIGHT - 1
+	
+	# 中间行
+	var relative_y: float = world_y - first_row_end
+	var row: int = 1 + int(relative_y / GRID_SIZE)
+	return clamp(row, 1, GRID_HEIGHT - 2)
 
 ## 更新包围盒
 func _update_bounding_box() -> void:
