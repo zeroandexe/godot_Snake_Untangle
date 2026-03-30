@@ -1,0 +1,293 @@
+[gd_scene format=3 uid="uid://dbgs55rjo4w3i"]
+
+[ext_resource type="Script" uid="uid://dllk148e1nvkx" path="res://scripts/game_scene.gd" id="1_qwerty"]
+[ext_resource type="Script" uid="uid://cwoxfic7h8mxi" path="res://scripts/ui_layer.gd" id="2_qwerty"]
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.0392157, 0.0392157, 0.0392157, 1)
+ambient_light_source = 1
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_1"]
+particle_flag_disable_z = true
+emission_shape = 1
+emission_sphere_radius = 50.0
+direction = Vector3(0, -1, 0)
+initial_velocity_min = 100.0
+initial_velocity_max = 200.0
+gravity = Vector3(0, 200, 0)
+scale_min = 4.0
+scale_max = 8.0
+
+[node name="Main" type="Node" unique_id=148948651]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=50968952]
+environment = SubResource("Environment_1")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1307884679]
+z_index = -10
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0392157, 0.0392157, 0.0392157, 1)
+
+[node name="GridLines" type="Node2D" parent="." unique_id=305674019]
+
+[node name="GameScene" type="Node2D" parent="." unique_id=216022752]
+script = ExtResource("1_qwerty")
+
+[node name="WormsContainer" type="Node2D" parent="GameScene" unique_id=391853538]
+
+[node name="Particles" type="GPUParticles2D" parent="GameScene" unique_id=128513992]
+position = Vector2(360, 640)
+emitting = false
+amount = 30
+lifetime = 0.5
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_1")
+
+[node name="Camera2D" type="Camera2D" parent="GameScene" unique_id=896635015]
+
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=125396232]
+script = ExtResource("2_qwerty")
+
+[node name="HUD" type="Control" parent="UILayer" unique_id=748441335]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopBar" type="HBoxContainer" parent="UILayer/HUD" unique_id=2030786880]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 70.0
+grow_horizontal = 2
+alignment = 1
+
+[node name="LevelLabel" type="Label" parent="UILayer/HUD/TopBar" unique_id=1749732585]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Level 1"
+
+[node name="Spacer" type="Control" parent="UILayer/HUD/TopBar" unique_id=575294694]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemainingLabel" type="Label" parent="UILayer/HUD/TopBar" unique_id=1109929049]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "🐍 × 5"
+horizontal_alignment = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="UILayer/HUD" unique_id=2108321519]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -100.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+
+[node name="Menus" type="Control" parent="UILayer" unique_id=1119891555]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainMenu" type="Control" parent="UILayer/Menus" unique_id=321822498]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="UILayer/Menus/MainMenu" unique_id=942723518]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -250.0
+offset_right = 200.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="UILayer/Menus/MainMenu/Panel" unique_id=20186912]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 48
+text = "Snake Untangle"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="UILayer/Menus/MainMenu/Panel" unique_id=97230326]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 110.0
+offset_bottom = 140.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 20
+text = "蛇群解结"
+horizontal_alignment = 1
+
+[node name="NewGameButton" type="Button" parent="UILayer/Menus/MainMenu/Panel" unique_id=359834315]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -100.0
+offset_right = 100.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "开始新游戏"
+
+[node name="ContinueButton" type="Button" parent="UILayer/Menus/MainMenu/Panel" unique_id=1978166192]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -20.0
+offset_right = 100.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "继续游戏"
+
+[node name="SettingsButton" type="Button" parent="UILayer/Menus/MainMenu/Panel" unique_id=758779922]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = 70.0
+offset_right = 100.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 28
+text = "设置"
+
+[node name="VictoryMenu" type="Control" parent="UILayer/Menus" unique_id=2084234201]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Overlay" type="ColorRect" parent="UILayer/Menus/VictoryMenu" unique_id=2056946178]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="Panel" type="Panel" parent="UILayer/Menus/VictoryMenu" unique_id=1824163281]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="UILayer/Menus/VictoryMenu/Panel" unique_id=1234300237]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 48
+text = "关卡完成!"
+horizontal_alignment = 1
+
+[node name="MessageLabel" type="Label" parent="UILayer/Menus/VictoryMenu/Panel" unique_id=41039247]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 120.0
+offset_bottom = 160.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 24
+text = "所有蛇已解开"
+horizontal_alignment = 1
+
+[node name="NextButton" type="Button" parent="UILayer/Menus/VictoryMenu/Panel" unique_id=1744286792]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = 30.0
+offset_right = 120.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 28
+text = "下一关"
+
+[node name="Effects" type="Control" parent="UILayer" unique_id=1756892170]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FlashEffect" type="ColorRect" parent="UILayer/Effects" unique_id=396694196]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 0)
