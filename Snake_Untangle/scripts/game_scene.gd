@@ -49,6 +49,9 @@ func _ready() -> void:
 	
 	# 绘制游戏区域边界（可视化调试）
 	_draw_game_area_border()
+	
+	# 设置随机背景
+	_update_background()
 
 ## 计算网格单元大小，确保覆盖整个游戏画面
 func _calculate_grid_size() -> void:
@@ -373,6 +376,9 @@ func _level_completed() -> void:
 	# 更新所有小虫的身体段大小（已在 _generate_level 中调用，这里确保）
 	_update_all_worms_body_sizes()
 	
+	# 切换到下一关随机背景
+	_update_background()
+	
 	# 恢复游戏状态
 	is_input_enabled = true
 	GameManager.current_state = GameManager.GameState.PLAYING
@@ -380,6 +386,16 @@ func _level_completed() -> void:
 ## 获取UI层
 func _get_ui_layer() -> CanvasLayer:
 	return get_node_or_null("../UILayer") as CanvasLayer
+
+## 更新背景图片
+func _update_background() -> void:
+	var bg_texture = GameManager.get_random_background()
+	if bg_texture == null:
+		return
+	var bg_node = get_node_or_null("../GameBackground") as TextureRect
+	if bg_node:
+		bg_node.texture = bg_texture
+		bg_node.visible = true
 
 ## 更新UI
 func _update_ui() -> void:

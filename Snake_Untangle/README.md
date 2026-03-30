@@ -211,6 +211,11 @@ var remaining_worms: int = 0:
 2. **碰撞检测失败**：确认 `is_grid_on_body` 排除头部判断
 3. **箭头不显示**：检查 `_update_direction_arrows` 是否在 `_process` 中调用
 
+## 音乐提示词
+```
+16-bit chiptune puzzle game background music, SNES retro style, soft square wave melody, playful triangle bass, gentle FM synth bells, airy noise percussion, pastel colorful atmosphere, relaxing untimed exploration, whimsical carefree mood, seamless loop, no vocals, healing casual game BGM, female-friendly, stress-free maze solving
+```
+
 ## 📄 许可证
 
 MIT License - 可自由使用和修改
