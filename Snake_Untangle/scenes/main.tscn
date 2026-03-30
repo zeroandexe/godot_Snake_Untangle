@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dllk148e1nvkx" path="res://scripts/game_scene.gd" id="1_qwerty"]
 [ext_resource type="Script" uid="uid://cwoxfic7h8mxi" path="res://scripts/ui_layer.gd" id="2_qwerty"]
+[ext_resource type="Texture2D" uid="uid://b54hue5nvvua5" path="res://source/images/backgroup/bg_1.png" id="3_bg1"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -32,6 +33,17 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.0392157, 0.0392157, 0.0392157, 1)
+
+[node name="GameBackground" type="TextureRect" parent="." unique_id=1307884680]
+visible = false
+z_index = -10
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_bg1")
+expand_mode = 1
 
 [node name="GridLines" type="Node2D" parent="." unique_id=305674019]
 

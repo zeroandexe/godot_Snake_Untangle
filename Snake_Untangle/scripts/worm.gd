@@ -495,7 +495,7 @@ func move_one_step(all_worms: Array[Worm], grid_width: int, grid_height: int) ->
 		current_state = State.REMOVED
 		move_completed.emit(self)
 		removed.emit(self)
-		GameManager.play_sound("pop")
+		GameManager.play_sound("death")
 		return true
 	
 	# 检查与其他虫子的碰撞
@@ -507,7 +507,8 @@ func move_one_step(all_worms: Array[Worm], grid_width: int, grid_height: int) ->
 		
 		# 如果下一位置在其他小虫的身体上（包括其头部），发生碰撞
 		if other.is_grid_on_body(next_pos, false):  # false表示包括其他小虫的头部
-			# 发生碰撞，开始反弹
+			# 发生碰撞，播放碰撞音效并开始反弹
+			GameManager.play_sound("collision")
 			start_reverse()
 			return false
 	

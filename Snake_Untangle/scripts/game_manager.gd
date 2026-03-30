@@ -30,6 +30,10 @@ var settings: Dictionary = {
 var level_data: Dictionary = {}
 var remaining_worms: int = 0
 
+# 音效资源
+var collision_sound: AudioStream = preload("res://source/sound/effects/worm_collision.wav")
+var death_sound: AudioStream = preload("res://source/sound/effects/worm_death.wav")
+
 func _ready() -> void:
 	_load_settings()
 
@@ -90,6 +94,10 @@ func play_sound(type: String) -> void:
 			player.stream = _generate_tone(200.0, 0.2, 0.3)
 		"pop":
 			player.stream = _generate_noise(0.1, 0.3)
+		"collision":
+			player.stream = collision_sound
+		"death":
+			player.stream = death_sound
 	
 	player.play()
 	await player.finished

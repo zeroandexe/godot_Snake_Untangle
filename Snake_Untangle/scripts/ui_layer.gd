@@ -16,11 +16,15 @@ extends CanvasLayer
 @onready var flash_effect: ColorRect = $Effects/FlashEffect
 
 var game_scene: Node2D = null
+var game_background: TextureRect = null
 
 func _ready() -> void:
 	# 连接游戏管理器信号
 	GameManager.level_started.connect(_on_level_started)
 	GameManager.level_completed.connect(_on_level_completed)
+	
+	# 获取游戏背景节点
+	game_background = get_node_or_null("../GameBackground")
 	
 	# 初始显示主菜单
 	_show_main_menu()
@@ -65,6 +69,10 @@ func show_victory() -> void:
 	tween.tween_callback(func(): flash_effect.visible = false)
 
 # 按钮回调
+func _set_game_background_visible(visible: bool) -> void:
+	if game_background:
+		game_background.visible = visible
+
 func _on_settings_pressed() -> void:
 	# TODO: 显示设置菜单
 	GameManager.play_sound("select")
@@ -86,6 +94,7 @@ func _show_main_menu() -> void:
 		hud.visible = false
 	if victory_menu:
 		victory_menu.visible = false
+	_set_game_background_visible(false)
 	GameManager.current_state = GameManager.GameState.MENU
 	
 	# 更新按钮状态
@@ -120,6 +129,7 @@ func _on_new_game_pressed() -> void:
 		main_menu.visible = false
 	if hud:
 		hud.visible = true
+	_set_game_background_visible(true)
 	
 	# 获取游戏场景并开始
 	game_scene = get_node_or_null("../GameScene")
@@ -138,6 +148,7 @@ func _on_continue_pressed() -> void:
 	if game_scene:
 		GameManager.start_level(GameManager.current_level)
 	
+	_set_game_background_visible(true)
 	GameManager.play_sound("select")
 
 func _on_level_started(_level: int) -> void:
@@ -147,3 +158,4 @@ func _on_level_started(_level: int) -> void:
 		victory_menu.visible = false
 	if main_menu:
 		main_menu.visible = false
+	_set_game_background_visible(true)
