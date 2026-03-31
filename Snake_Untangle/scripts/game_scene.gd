@@ -454,12 +454,13 @@ func _play_success_effect(worm: Worm) -> void:
 func _level_completed() -> void:
 	GameManager.complete_level()
 	
-	# 显示胜利UI
+	# 显示胜利UI（包含胜利动画和"下一关"按钮）
 	_show_victory_ui()
 	
-	# 延迟进入下一关
-	await get_tree().create_timer(GameConfig.TIMING.level_complete_delay).timeout
-	
+	# 注意：不再自动延迟进入下一关，等待玩家点击"下一关"按钮
+
+## 生成下一关（由UI层点击"下一关"按钮后调用）
+func generate_next_level() -> void:
 	GameManager.current_level += 1
 	
 	# 保存新的关卡进度（关键：进入新关卡后立即保存）

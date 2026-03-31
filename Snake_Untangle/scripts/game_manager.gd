@@ -80,9 +80,7 @@ func start_level(level: int) -> void:
 ## 关卡完成
 func complete_level() -> void:
 	current_state = GameState.LEVEL_COMPLETE
-	vibrate(GameConfig.AUDIO.vibration.long)
-	await get_tree().create_timer(GameConfig.AUDIO.vibration.double_interval).timeout
-	vibrate(GameConfig.AUDIO.vibration.long)
+	# 移除震动效果，让玩家可以快速点击进入下一关
 	level_completed.emit(current_level)
 	save_progress()
 

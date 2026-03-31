@@ -63,14 +63,8 @@ func update_game_ui(data: Dictionary) -> void:
 
 ## 显示胜利界面
 func show_victory() -> void:
+	# 直接显示胜利菜单，无动画效果，让玩家可以快速点击进入下一关
 	victory_menu.visible = true
-	
-	# 播放闪光效果
-	var tween = create_tween()
-	flash_effect.visible = true
-	flash_effect.modulate = Color(1, 1, 1, 1)
-	tween.tween_property(flash_effect, "modulate", Color(1, 1, 1, 0), GameConfig.TIMING.level_complete_flash)
-	tween.tween_callback(func(): flash_effect.visible = false)
 
 # 按钮回调
 func _set_game_background_visible(show_bg: bool) -> void:
@@ -92,6 +86,10 @@ func _on_next_level_pressed() -> void:
 	if victory_menu:
 		victory_menu.visible = false
 	GameManager.play_sound("select")
+	
+	# 立即生成下一关，无延迟
+	if game_scene:
+		game_scene.generate_next_level()
 
 func _on_level_completed(_level: int) -> void:
 	# 胜利界面由game_scene调用show_victory显示
