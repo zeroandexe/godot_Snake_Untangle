@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dllk148e1nvkx" path="res://scripts/game_scene.gd" id="1_qwerty"]
 [ext_resource type="Script" uid="uid://cwoxfic7h8mxi" path="res://scripts/ui_layer.gd" id="2_qwerty"]
 [ext_resource type="Texture2D" uid="uid://b54hue5nvvua5" path="res://source/images/backgroup/bg_1.png" id="3_bg1"]
+[ext_resource type="Texture2D" path="res://source/images/icon/bomb.png" id="4_bomb"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -101,24 +102,49 @@ theme_override_font_sizes/font_size = 32
 text = "🐍 × 5"
 horizontal_alignment = 2
 
-[node name="BottomBar" type="HBoxContainer" parent="UILayer/HUD" unique_id=2108321519]
+[node name="BottomBar" type="Control" parent="UILayer/HUD" unique_id=2108321519]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 20.0
-offset_top = -60.0
+offset_top = -80.0
 offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 0
-alignment = 0
 
 [node name="ScoreLabel" type="Label" parent="UILayer/HUD/BottomBar" unique_id=2108321520]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = 0.0
+offset_bottom = 20.0
+grow_vertical = 2
 theme_override_font_sizes/font_size = 32
 text = "分数: 0"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="BombButton" type="TextureButton" parent="UILayer/HUD/BottomBar" unique_id=2108321521]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -24.0
+offset_top = 0.0
+offset_right = 24.0
+offset_bottom = 24.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(68, 68)
+texture_normal = ExtResource("4_bomb")
+ignore_texture_size = true
+stretch_mode = 5
 
 [node name="Menus" type="Control" parent="UILayer" unique_id=1119891555]
 layout_mode = 3
