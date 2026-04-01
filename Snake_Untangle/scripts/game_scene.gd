@@ -46,6 +46,9 @@ func _ready() -> void:
 	call_deferred("_adjust_camera")
 	call_deferred("_draw_grid_lines")
 	
+	# 确保倍率初始化为1
+	GameManager.combo_multiplier = 1
+	
 	# 生成关卡
 	_generate_level()
 	
@@ -64,6 +67,9 @@ func _on_level_started(level: int) -> void:
 	# 清除现有关卡
 	_clear_worms()
 	_clear_direction_arrows()
+	
+	# 重置倍率（新关卡开始时，分数累计不重置）
+	GameManager.combo_multiplier = 1
 	
 	# 重新初始化关卡生成器
 	level_generator = LevelGenerator.new(level)
@@ -401,6 +407,9 @@ func _on_worm_move_failed(_worm: Worm) -> void:
 func _on_worm_move_reversed(_worm: Worm) -> void:
 	# 反弹时更新方向箭头
 	_update_direction_arrows()
+	
+	# 碰撞后倍率已重置，更新UI显示
+	_update_ui()
 
 ## 虫子移出屏幕完成回调
 func _on_worm_move_completed(worm: Worm) -> void:
@@ -423,6 +432,13 @@ func _on_worm_removed(worm: Worm) -> void:
 	
 	# 减少计数
 	GameManager.remaining_worms = max(0, GameManager.remaining_worms - 1)
+	
+	# 计算分数：关卡数 × 倍率
+	var points = GameManager.current_level * GameManager.combo_multiplier
+	GameManager.score += points
+	
+	# 增加倍率（连续消除）
+	GameManager.combo_multiplier += 1
 	
 	# 标记脏标记
 	_free_end_dirty = true
@@ -490,6 +506,9 @@ func generate_next_level() -> void:
 	# 保存新的关卡进度（关键：进入新关卡后立即保存）
 	GameManager.save_progress()
 	
+	# 重置倍率（新关卡开始时，分数累计不重置）
+	GameManager.combo_multiplier = 1
+	
 	# 重新创建关卡生成器以获取新的网格宽度
 	level_generator = LevelGenerator.new(GameManager.current_level)
 	var grid_size = level_generator.get_grid_size()
@@ -541,6 +560,8 @@ func _update_ui() -> void:
 	var ui_data = {
 		"level": GameManager.current_level,
 		"remaining": GameManager.remaining_worms,
+		"score": GameManager.score,
+		"multiplier": GameManager.combo_multiplier,
 	}
 	
 	var ui = _get_ui_layer()

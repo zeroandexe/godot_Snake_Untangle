@@ -30,6 +30,8 @@ var settings: Dictionary = {
 # 关卡数据
 var level_data: Dictionary = {}
 var remaining_worms: int = 0
+var score: int = 0  # 游戏分数（累计，会保存到存档）
+var combo_multiplier: int = 1  # 连击倍率，初始为1
 
 # 音效资源（在 _ready 中动态加载）
 var collision_sound: AudioStream
@@ -88,6 +90,7 @@ func complete_level() -> void:
 func save_progress() -> void:
 	SaveManager.save_game({
 		"current_level": current_level,
+		"score": score,
 		"settings": settings,
 	})
 
@@ -123,6 +126,8 @@ func _load_settings() -> void:
 			settings.start_level = 1
 	if data.has("current_level"):
 		current_level = data.current_level
+	if data.has("score"):
+		score = data.score
 
 ## 播放音效（程序生成）
 func play_sound(type: String) -> void:

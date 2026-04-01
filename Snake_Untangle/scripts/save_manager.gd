@@ -58,6 +58,7 @@ func load_game() -> Dictionary:
 func _get_default_data() -> Dictionary:
 	return {
 		"current_level": 1,
+		"score": 0,  # 游戏分数
 		"settings": {
 			"sound_enabled": true,
 			"sound_volume": 0.8,

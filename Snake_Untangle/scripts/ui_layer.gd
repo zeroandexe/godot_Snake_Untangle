@@ -7,6 +7,7 @@ extends CanvasLayer
 @onready var hud: Control = $HUD
 @onready var level_label: Label = $HUD/TopBar/LevelLabel
 @onready var remaining_label: Label = $HUD/TopBar/RemainingLabel
+@onready var score_label: Label = $HUD/BottomBar/ScoreLabel
 
 # 菜单
 @onready var victory_menu: Control = $Menus/VictoryMenu
@@ -60,6 +61,13 @@ func update_game_ui(data: Dictionary) -> void:
 	
 	if data.has("remaining") and remaining_label:
 		remaining_label.text = GameConfig.UI.hud.remaining_label_format % data.remaining
+	
+	if data.has("score") and score_label:
+		var multiplier = data.get("multiplier", 1)
+		if multiplier > 1:
+			score_label.text = GameConfig.UI.hud.score_label_with_multiplier_format % [data.score, multiplier]
+		else:
+			score_label.text = GameConfig.UI.hud.score_label_format % data.score
 
 ## 显示胜利界面
 func show_victory() -> void:
@@ -135,9 +143,13 @@ func _on_new_game_pressed() -> void:
 	SaveManager.reset_save()
 	GameManager.settings = current_settings
 	
+	# 清空积分
+	GameManager.score = 0
+	
 	# 重新保存设置，确保 start_level 被正确保存
 	SaveManager.save_game({
 		"current_level": start_level,  # 使用起始关卡作为当前关卡
+		"score": 0,  # 新游戏积分清零
 		"settings": GameManager.settings,
 	})
 	

@@ -108,12 +108,17 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 20.0
-offset_top = -100.0
+offset_top = -60.0
 offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 0
-alignment = 1
+alignment = 0
+
+[node name="ScoreLabel" type="Label" parent="UILayer/HUD/BottomBar" unique_id=2108321520]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "分数: 0"
 
 [node name="Menus" type="Control" parent="UILayer" unique_id=1119891555]
 layout_mode = 3

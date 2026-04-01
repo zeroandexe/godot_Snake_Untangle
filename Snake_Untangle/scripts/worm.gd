@@ -237,65 +237,27 @@ func _create_collision_shape() -> void:
 	_update_collision_shape_points()
 	add_child(_cached_collision_shape)
 
-## 更新碰撞形状点（增量更新）
+## 更新碰撞形状点（使用简化的圆形碰撞，避免凸分解失败）
 func _update_collision_shape_points() -> void:
 	if _cached_collision_shape == null or grid_positions.is_empty():
 		return
 	
-	var n = grid_positions.size()
+	# 始终使用覆盖整个虫子的包围圆形
+	# 避免复杂多边形导致的凸分解失败
+	var head_pos = _grid_to_world(grid_positions[0])
+	var tail_pos = _grid_to_world(grid_positions[grid_positions.size() - 1])
+	var center = (head_pos + tail_pos) * 0.5
 	
-	# 当虫子太短时使用简单的圆形碰撞（避免凸分解失败）
-	if n < 2:
-		var center = _grid_to_world(grid_positions[0])
-		var radius = HEAD_SIZE * 0.5
-		# 创建八边形近似圆形
-		var circle_points: PackedVector2Array = []
-		for j in range(8):
-			var angle = j * PI / 4
-			circle_points.append(center + Vector2(cos(angle), sin(angle)) * radius)
-		_cached_collision_shape.polygon = circle_points
-		return
+	# 计算包围半径（覆盖头部到尾部的距离加上头部半径）
+	var body_radius = head_pos.distance_to(tail_pos) * 0.5 + HEAD_SIZE
 	
-	# 创建覆盖连续身体的碰撞区域
-	var collision_points: PackedVector2Array = []
-	collision_points.resize(n * 2)
+	# 创建八边形近似圆形（比复杂多边形更可靠）
+	var circle_points: PackedVector2Array = []
+	for j in range(8):
+		var angle = j * PI / 4
+		circle_points.append(center + Vector2(cos(angle), sin(angle)) * body_radius)
 	
-	# 沿身体线段创建碰撞多边形（上半部分 + 下半部分，一次遍历）
-	for i in range(n):
-		var grid_pos = grid_positions[i]
-		var center = _grid_to_world(grid_pos)
-		var radius = lerp(HEAD_SIZE * 0.5, TAIL_SIZE * 0.5, float(i) / max(1, n - 1))
-		
-		# 获取线段方向（添加安全检查）
-		var dir: Vector2
-		if i == 0:
-			var to_next = _grid_to_world(grid_positions[1]) - center
-			if to_next.length_squared() < 0.001:
-				dir = Vector2.RIGHT
-			else:
-				dir = to_next.normalized()
-		elif i == n - 1:
-			var to_prev = _grid_to_world(grid_positions[i - 1]) - center
-			if to_prev.length_squared() < 0.001:
-				dir = Vector2.RIGHT
-			else:
-				dir = -(center - _grid_to_world(grid_positions[i - 1])).normalized()
-		else:
-			var prev_pos = _grid_to_world(grid_positions[i - 1])
-			var next_pos = _grid_to_world(grid_positions[i + 1])
-			var diff = next_pos - prev_pos
-			if diff.length_squared() < 0.001:
-				dir = Vector2.RIGHT
-			else:
-				dir = diff.normalized()
-		
-		var perp = dir.orthogonal()
-		collision_points[i] = center + perp * radius  # 上半部分
-		collision_points[n * 2 - 1 - i] = center - perp * radius  # 下半部分（反向）
-	
-	# 确保至少有3个点才能形成有效多边形
-	if collision_points.size() >= 3:
-		_cached_collision_shape.polygon = collision_points
+	_cached_collision_shape.polygon = circle_points
 
 ## 更新碰撞形状（兼容旧调用）
 func _update_collision_shape() -> void:
@@ -594,6 +556,9 @@ func start_reverse() -> void:
 	
 	GameManager.vibrate(GameConfig.AUDIO.vibration.extra_long)
 	GameManager.play_sound("fail")
+	
+	# 碰撞后重置倍率
+	GameManager.combo_multiplier = 1
 	
 	move_reversed.emit(self)
 

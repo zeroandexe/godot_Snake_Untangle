@@ -197,6 +197,8 @@ const UI = {
 	"hud": {
 		"level_label_format": "Level %d",
 		"remaining_label_format": "🐍 × %d",
+		"score_label_format": "分数: %d",
+		"score_label_with_multiplier_format": "分数: %d (x%d)",
 	},
 }
 
